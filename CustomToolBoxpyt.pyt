@@ -15,13 +15,13 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [XYtoPolygonManagement]
+        self.tools = [XYtoPolygonManagement, XYtoPolygon]
 
 
 class XYtoPolygonManagement(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Создание полигонов из таблицы Excel XY"
+        self.label = "Создание полигонов из таблицы Excel XY (стандарт)"
         self.description = "Создание полигонов выполняется при помощи стандартных инструментов ArcPy"
         self.canRunInBackground = False
 
@@ -100,13 +100,13 @@ class XYtoPolygonManagement(object):
 
             sh = book.sheet_by_index(0)  # Страница книги Excel с индексом 0
 
-            listFields = []
-            for headCells in range(sh.ncols):
-                listFields.append(sh.cell(0, headCells).value)
+            list_fields = []
+            for head_cells in range(sh.ncols):
+                list_fields.append(sh.cell(0, head_cells).value)
 
-            parameters[1].filter.list = listFields
-            parameters[2].filter.list = listFields
-            parameters[3].filter.list = listFields
+            parameters[1].filter.list = list_fields
+            parameters[2].filter.list = list_fields
+            parameters[3].filter.list = list_fields
             
         except Exception as err:
 
@@ -145,19 +145,19 @@ class XYtoPolygonManagement(object):
             mxd = arcpy.mapping.MapDocument("CURRENT")
             
             # получаем фрейм данных с индексом=0
-            dataFrame = arcpy.mapping.ListDataFrames(mxd)[0]
+            data_frame = arcpy.mapping.ListDataFrames(mxd)[0]
 
             # получаем текущую базу геоданных
-            defaultGDB = arcpy.env.workspace
+            default_gdb = arcpy.env.workspace
             
             # проверяем, установлена ли база геоданных, если нет устанавливаем по умолчанию
             if parameters[6].valueAsText:
-                pathGDB = parameters[6].valueAsText
+                path_gdb = parameters[6].valueAsText
             else:
-                pathGDB = defaultGDB
+                path_gdb = default_gdb
                 
             # устанавливаем текущее рабочее пространство
-            arcpy.env.workspace = pathGDB
+            arcpy.env.workspace = path_gdb
 
             # получаем книгу Excel
             book = xlrd.open_workbook(
@@ -167,26 +167,26 @@ class XYtoPolygonManagement(object):
             sh = book.sheet_by_index(0)
 
             # формируем путь для загрузки данных из страницы Excel
-            inExcelSheetName = parameters[0].valueAsText + '\\' + sh.name + '$'
+            in_excel_sh = parameters[0].valueAsText + '\\' + sh.name + '$'
             
             # формируем название точечных данных
-            pointsLayerName = ''.join(sh.name.split()).replace('-', '_') + '_point'
+            points_data = ''.join(sh.name.split()).replace('-', '_') + '_point'
             
             # формируем название точечного класса пространственных объектов
-            pointsLayerNameFeature = ''.join(
+            points_feature = ''.join(
                 sh.name.split()).replace('-', '_') + '_pointFeature'
             
             # формируем название линейного класса пространственных объектов
-            linesLayerNameFeature = pathGDB + '\\' + \
+            lines_feature = path_gdb + '\\' + \
                 ''.join(sh.name.split()).replace('-', '_') + '_lineFeature'
                 
             # формируем название полигонального класса пространственных объектов
-            polygonLayerNameFeature = pathGDB + '\\' + \
+            polygons_feature = path_gdb + '\\' + \
                 ''.join(sh.name.split()).replace('-', '_') + '_polygonFeature'
 
             arcpy.AddMessage("\n-------------------------\n")
-            arcpy.AddMessage("Текущий фрейм: {0}".format(dataFrame.name))
-            arcpy.AddMessage("База геоданных: {0}".format(pathGDB))
+            arcpy.AddMessage("Текущий фрейм: {0}".format(data_frame.name))
+            arcpy.AddMessage("База геоданных: {0}".format(path_gdb))
             arcpy.AddMessage("Книга Excel: {0}".format(parameters[0].value))
             arcpy.AddMessage("Лист Excel: {0}".format(sh.name))
             arcpy.AddMessage("\n-------------------------\n")
@@ -205,46 +205,284 @@ class XYtoPolygonManagement(object):
 
             # преобразовываем точки из таблицы Excel в слой событий
             arcpy.MakeXYEventLayer_management(
-                inExcelSheetName, parameters[1].valueAsText, parameters[2].valueAsText, pointsLayerName, parameters[5].valueAsText, "")
+                in_excel_sh, parameters[1].valueAsText, parameters[2].valueAsText, points_data, parameters[5].valueAsText, "")
 
             # преобразовываем точечный слой событий в точечный класс объектов
             arcpy.conversion.FeatureClassToFeatureClass(
-                pointsLayerName, pathGDB, pointsLayerNameFeature)
+                points_data, path_gdb, points_feature)
 
             # преобразовываем точечный класс объектов в линейный класс объектов
             arcpy.PointsToLine_management(
-                pointsLayerNameFeature, linesLayerNameFeature, lineField, "", lineClose)
+                points_feature, lines_feature, lineField, "", lineClose)
 
             # преобразовываем линейный класс объектов в полигональный класс объектов
             arcpy.FeatureToPolygon_management(
-                linesLayerNameFeature, polygonLayerNameFeature)
+                lines_feature, polygons_feature)
 
             # преобразовываем полигональный класс объектов в полигональный слой
-            addLayerPolygonToMap = arcpy.mapping.Layer(polygonLayerNameFeature)
+            layer_to_map = arcpy.mapping.Layer(polygons_feature)
 
             # добавляем полигональный слой на карту
-            arcpy.mapping.AddLayer(dataFrame, addLayerPolygonToMap)
+            arcpy.mapping.AddLayer(data_frame, layer_to_map)
 
             arcpy.AddMessage("Удаляются временные слои... ")
             arcpy.AddMessage("\n-------------------------\n")
 
             # удаляем из базы геоданных промежуточные слои
-            arcpy.Delete_management(pointsLayerNameFeature)
-            arcpy.Delete_management(linesLayerNameFeature)
+            arcpy.Delete_management(points_feature)
+            arcpy.Delete_management(lines_feature)
 
             arcpy.AddMessage(
-                "Слой: {0} - добавлен на карту".format(addLayerPolygonToMap.name))
+                "Слой: {0} - добавлен на карту".format(layer_to_map.name))
             arcpy.AddMessage("\n-------------------------\n")
 
             # устанавливаем экстент по добавленному полигональному слою
-            dataFrame.extent = arcpy.mapping.ListLayers(
-                mxd, addLayerPolygonToMap.name, dataFrame)[0].getExtent()
+            data_frame.extent = arcpy.mapping.ListLayers(
+                mxd, layer_to_map.name, data_frame)[0].getExtent()
 
             # удаляем переменные
-            del mxd, dataFrame, defaultGDB, pathGDB, book, sh
+            del mxd, data_frame, default_gdb, path_gdb, book, sh
 
         except Exception as err:
 
             arcpy.AddMessage("Ошибка: {0}".format(err))
 
+        return
+
+# ---------------------------------------------------------------------------------------
+
+class XYtoPolygon(object):
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Создание полигонов из таблицы Excel XY (таблица -> полигон)"
+        self.description = "Создание полигонов выполняется напрямую из списка точек"
+        self.canRunInBackground = False
+
+    def getParameterInfo(self):
+        """Define parameter definitions"""
+
+        #0
+        in_excel = arcpy.Parameter(
+            name='in_excel_file',
+            displayName='Входной Excel-файл с координатами XY',
+            datatype='DEFile',
+            direction='Input',
+            parameterType='Required')
+
+        #1
+        in_x = arcpy.Parameter(
+            name='in_x_coord',
+            displayName='Поле X',
+            datatype='GPString',
+            direction='Input',
+            parameterType='Required')
+
+        #2
+        in_y = arcpy.Parameter(
+            name='in_y_coord',
+            displayName='Поле Y',
+            datatype='GPString',
+            direction='Input',
+            parameterType='Required')
+        
+        #3
+        in_part_field = arcpy.Parameter(
+            name='in_line_field_opt',
+            displayName='Поле линий',
+            datatype='GPString',
+            direction='Input',
+            parameterType='Optional')
+
+        #4
+        in_close = arcpy.Parameter(
+            name=' in_line_close_opt',
+            displayName='Замкнуть линию',
+            datatype='GPBoolean',
+            direction='Input',
+            parameterType='Optional')
+
+        #5
+        in_coord_system = arcpy.Parameter(
+            name='in_cs',
+            displayName='Система координат входных данных',
+            datatype='GPCoordinateSystem',
+            direction='Input',
+            parameterType='Required')
+        
+        #6
+        in_gedatabase = arcpy.Parameter(
+            name='in_GDB_opt',
+            displayName='Выходная база геоданных',
+            datatype='DEWorkspace',
+            direction='Input',
+            parameterType='Optional')
+
+        in_x .filter.type = "ValueList"
+        in_y .filter.type = "ValueList"
+        in_part_field .filter.type = "ValueList"
+        in_excel.filter.list = ['xls', 'xlsx']
+        
+        params = [in_excel, in_x, in_y, in_part_field, in_close, in_coord_system, in_gedatabase]
+        
+        return params
+
+    def isLicensed(self):
+        """Set whether tool is licensed to execute."""
+        return True
+
+    def updateParameters(self, parameters):
+        """Modify the values and properties of parameters before internal
+        validation is performed.  This method is called whenever a parameter
+        has been changed."""
+        
+        try:
+            book = xlrd.open_workbook(parameters[0].valueAsText)  # получаем книгу Excel
+            sh = book.sheet_by_index(0)  # Страница книги Excel с индексом 0
+            list_fields = []
+            for head_cells in range(sh.ncols):
+                list_fields.append(sh.cell(0, head_cells).value)
+
+            parameters[1].filter.list = list_fields
+            parameters[2].filter.list = list_fields
+            parameters[3].filter.list = list_fields
+            
+        except Exception as err:
+            arcpy.AddMessage("Ошибка: {0}".format(err))
+        return
+
+    def updateMessages(self, parameters):
+        """Modify the messages created by internal validation for each tool
+        parameter.  This method is called after internal validation."""
+
+        if not parameters[0].value:
+            parameters[0].setErrorMessage(
+                'Необходимо выбрать файл Excel с расширением .xls')
+
+        if not parameters[1].value:
+            parameters[1].setErrorMessage(
+                'Необходимо выбрать поле с координатой X')
+
+        if not parameters[2].value:
+            parameters[2].setErrorMessage(
+                'Необходимо выбрать поле с координатой Y')
+
+        if not parameters[5].value:
+            parameters[5].setErrorMessage(
+                'Необходимо выбрать систему координат входных данных')
+
+        return
+
+    def execute(self, parameters, messages):
+        """The source code of the tool."""
+
+        try:
+            # получаем текущий документ карты
+            mxd = arcpy.mapping.MapDocument("CURRENT")
+            
+            # получаем фрейм данных с индексом=0
+            data_frame = arcpy.mapping.ListDataFrames(mxd)[0]
+
+            # получаем текущую базу геоданных
+            default_gdb = arcpy.env.workspace
+            
+            # проверяем, установлена ли база геоданных, если нет устанавливаем по умолчанию
+            if parameters[6].valueAsText:
+                path_gdb = parameters[6].valueAsText
+            else:
+                path_gdb = default_gdb
+                
+            # устанавливаем текущее рабочее пространство
+            arcpy.env.workspace = path_gdb
+
+            # получаем книгу Excel
+            book = xlrd.open_workbook(parameters[0].valueAsText)
+            
+            # получаем страницу книги Excel с индексом=0
+            sh = book.sheet_by_index(0)
+            
+            # формируем название полигонального класса пространственных объектов
+            polygons_feature = path_gdb + '\\' + \
+                ''.join(sh.name.split()).replace('-', '_') + '_polygonFeature'
+
+            arcpy.AddMessage("\n-------------------------\n")
+            arcpy.AddMessage("Текущий фрейм: {0}".format(data_frame.name))
+            arcpy.AddMessage("База геоданных: {0}".format(path_gdb))
+            arcpy.AddMessage("Книга Excel: {0}".format(parameters[0].value))
+            arcpy.AddMessage("Лист Excel: {0}".format(sh.name))
+            arcpy.AddMessage("\n-------------------------\n")
+            
+            zero_row = []
+            coord_list = []
+            parts_list = []
+            uniq_parts_list = []
+            
+            for zr in range(sh.ncols):
+                zero_row.append(sh.cell_value(rowx = 0, colx = zr))
+                
+            try:
+                field_x = zero_row.index(parameters[1].valueAsText)
+                field_y = zero_row.index(parameters[2].valueAsText)
+                field_part = zero_row.index(parameters[3].valueAsText)
+                
+                for item in range(1, sh.nrows):
+                    coord_list.append ([sh.cell_value (rowx=item, colx=int(field_x)), sh.cell_value (rowx=item, colx=int(field_y)), sh.cell_value (rowx=item, colx=int(field_part))])
+            
+            except:
+                field_x = zero_row.index(parameters[1].valueAsText)
+                field_y = zero_row.index(parameters[2].valueAsText)
+                
+                for item in range(1, sh.nrows):
+                    coord_list.append ([sh.cell_value (rowx=item, colx=int(field_x)), sh.cell_value (rowx=item, colx=int(field_y))])
+
+            for item in coord_list:
+                parts_list.append (item[-1])
+            
+            uniq_parts_list= list(set(parts_list))
+            itog_coord_list= []
+            for uniq_parts_item in uniq_parts_list:
+                total_list_coord = []
+                for coord_list_item in coord_list:
+                    if coord_list_item[-1] == uniq_parts_item:
+                        total_list_coord.append(coord_list_item)
+                        
+                if parameters[4]:
+                    total_list_coord.append(total_list_coord[0])
+                    
+                itog_coord_list.append(total_list_coord)
+                
+            #arcpy.AddMessage (itog_coord_list)
+            
+            point = arcpy.Point()
+            array = arcpy.Array()
+            featureList = []
+            
+            for feature in itog_coord_list:
+                for coordPair in feature:
+                    point.X = coordPair[0]
+                    point.Y = coordPair[1]
+                    array.add(point)
+
+                polygon = arcpy.Polygon(array, parameters[5].valueAsText)
+                array.removeAll()
+                featureList.append(polygon)
+                
+            arcpy.CopyFeatures_management(featureList, polygons_feature)
+            
+            # преобразовываем полигональный класс объектов в полигональный слой
+            layer_to_map = arcpy.mapping.Layer(polygons_feature)
+
+            # добавляем полигональный слой на карту
+            arcpy.mapping.AddLayer(data_frame, layer_to_map)
+
+            arcpy.AddMessage(
+                "Слой: {0} - добавлен на карту".format(layer_to_map.name))
+            arcpy.AddMessage("\n-------------------------\n")
+
+            # устанавливаем экстент по добавленному полигональному слою
+            data_frame.extent = arcpy.mapping.ListLayers(
+                mxd, layer_to_map.name, data_frame)[0].getExtent()
+         
+
+        except Exception as err:
+            arcpy.AddMessage("Ошибка: {0}".format(err))
         return
