@@ -228,6 +228,7 @@ class XYtoPolygonManagement(object):
             arcpy.AddMessage("\n-------------------------\n")
 
             # удаляем из базы геоданных промежуточные слои
+            arcpy.Delete_management(points_data)
             arcpy.Delete_management(points_feature)
             arcpy.Delete_management(lines_feature)
             
