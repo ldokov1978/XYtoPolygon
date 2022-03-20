@@ -438,7 +438,6 @@ class XYtoPolygon(object):
             if parameters[3].valueAsText:
                 # получаем индексы полей x, y и  part
                 arcpy.AddMessage("Получаем индексы полей...")
-                arcpy.AddMessage("\n-------------------------\n")
 
                 field_x = zero_row.index(parameters[1].valueAsText)
                 field_y = zero_row.index(parameters[2].valueAsText)
@@ -447,7 +446,6 @@ class XYtoPolygon(object):
                 # записываем все значения координат и частей полигонов в список
                 arcpy.AddMessage(
                     "Записываем все значения координат и частей полигонов в список...")
-                arcpy.AddMessage("\n-------------------------\n")
 
                 for item in range(1, sh.nrows):
                     coord_list.append([sh.cell_value(rowx=item, colx=int(field_x)), sh.cell_value(
@@ -456,7 +454,6 @@ class XYtoPolygon(object):
                 # записываем все значения из частей полигонов
                 arcpy.AddMessage(
                     "Записываем все значения из частей полигонов...")
-                arcpy.AddMessage("\n-------------------------\n")
 
                 for item in coord_list:
                     parts_list.append(item[-1])
@@ -464,14 +461,12 @@ class XYtoPolygon(object):
                 # получаем уникальные значения частей полигонов
                 arcpy.AddMessage(
                     "Получаем уникальные значения частей полигонов...")
-                arcpy.AddMessage("\n-------------------------\n")
 
                 uniq_parts_list = list(set(parts_list))
 
                 # формируем полигоны по уникальным значениям частей полигонов
                 arcpy.AddMessage(
                     "Формируем полигоны по уникальным значениям частей полигонов...")
-                arcpy.AddMessage("\n-------------------------\n")
                 for uniq_parts_item in uniq_parts_list:
                     total_list_coord = []
 
@@ -487,13 +482,11 @@ class XYtoPolygon(object):
                     itog_coord_list.append(total_list_coord)
                 arcpy.AddMessage(
                     "Добавляем значения координат в итоговый список...")
-                arcpy.AddMessage("\n-------------------------\n")
             else:
                 # иначе записываем только координаты X и Y
 
                 # получаем индексы полей x, y
                 arcpy.AddMessage("Получаем индексы полей...")
-                arcpy.AddMessage("\n-------------------------\n")
 
                 field_x = zero_row.index(parameters[1].valueAsText)
                 field_y = zero_row.index(parameters[2].valueAsText)
@@ -501,7 +494,6 @@ class XYtoPolygon(object):
                 # записываем все значения координат в список
                 arcpy.AddMessage(
                     "Записываем все значения координат в список...")
-                arcpy.AddMessage("\n-------------------------\n")
 
                 for item in range(1, sh.nrows):
                     coord_list.append([sh.cell_value(rowx=item, colx=int(
@@ -515,13 +507,11 @@ class XYtoPolygon(object):
                 itog_coord_list.append(coord_list)
                 arcpy.AddMessage(
                     "Добавляем значения координат в итоговый список...")
-                arcpy.AddMessage("\n-------------------------\n")
 
             #arcpy.AddMessage (itog_coord_list)
 
             # строим полигоны и добавляем на карту
             arcpy.AddMessage("Строим полигоны и добавляем на карту...")
-            arcpy.AddMessage("\n-------------------------\n")
 
             point = arcpy.Point()
             array = arcpy.Array()
@@ -565,7 +555,6 @@ class XYtoPolygon(object):
             arcpy.Delete_management(polygons_feature + "_erase")
 
             arcpy.AddMessage("Удаляются временные слои... ")
-            arcpy.AddMessage("\n-------------------------\n")
 
             # добавляем слой на карту
             arcpy.mapping.AddLayer(data_frame, layer_to_map, "BOTTOM")
