@@ -2,7 +2,11 @@
 # Устранение проблем с кодировкой UTF-8
 
 import xlrd
+import xlwt
 import arcpy
+import os
+import datetime
+import subprocess
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -15,7 +19,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [XYtoPolygonManagement, XYtoPolygon]
+        self.tools = [XYtoPolygonManagement, XYtoPolygon, DMStoPointsTable]
 
 
 class XYtoPolygonManagement(object):
@@ -97,7 +101,7 @@ class XYtoPolygonManagement(object):
 
         try:
 
-            book = xlrd.open_workbook(
+            book = xlrd.open_wb(
                 parameters[0].valueAsText)  # получаем книгу Excel
 
             sh = book.sheet_by_index(0)  # Страница книги Excel с индексом 0
@@ -162,7 +166,7 @@ class XYtoPolygonManagement(object):
             arcpy.env.workspace = path_gdb
 
             # получаем книгу Excel
-            book = xlrd.open_workbook(
+            book = xlrd.open_wb(
                 parameters[0].valueAsText)
 
             # получаем страницу книги Excel с индексом=0
@@ -231,10 +235,10 @@ class XYtoPolygonManagement(object):
             arcpy.Delete_management(points_data)
             arcpy.Delete_management(points_feature)
             arcpy.Delete_management(lines_feature)
-            
+
             # добавляем полигональный слой на карту
             arcpy.mapping.AddLayer(data_frame, layer_to_map)
-            
+
             # устанавливаем экстент по добавленному полигональному слою
             data_frame.extent = arcpy.mapping.ListLayers(
                 mxd, layer_to_map.name, data_frame)[0].getExtent()
@@ -343,7 +347,7 @@ class XYtoPolygon(object):
         has been changed."""
 
         try:
-            book = xlrd.open_workbook(
+            book = xlrd.open_wb(
                 parameters[0].valueAsText)  # получаем книгу Excel
             sh = book.sheet_by_index(0)  # страница книги Excel с индексом 0
 
@@ -407,7 +411,7 @@ class XYtoPolygon(object):
             arcpy.env.workspace = path_gdb
 
             # получаем книгу Excel
-            book = xlrd.open_workbook(parameters[0].valueAsText)
+            book = xlrd.open_wb(parameters[0].valueAsText)
 
             # получаем страницу книги Excel с индексом=0
             sh = book.sheet_by_index(0)
@@ -508,7 +512,7 @@ class XYtoPolygon(object):
                 arcpy.AddMessage(
                     "Добавляем значения координат в итоговый список...")
 
-            #arcpy.AddMessage (itog_coord_list)
+            # arcpy.AddMessage (itog_coord_list)
 
             # строим полигоны и добавляем на карту
             arcpy.AddMessage("Строим полигоны и добавляем на карту...")
@@ -529,14 +533,15 @@ class XYtoPolygon(object):
 
             # создаём основной класс объектов
             arcpy.CopyFeatures_management(featureList, polygons_feature)
-            
+
             # создаём класс пересекающих объектов
             arcpy.Intersect_analysis(
                 polygons_feature, polygons_feature + "_intersect", "NO_FID", "", "INPUT")
-            
+
             # агрегируем пересекающиеся объекты
-            arcpy.AggregatePolygons_cartography(polygons_feature + "_intersect", polygons_feature + "_aggregate", "1 Meters")
-            
+            arcpy.AggregatePolygons_cartography(
+                polygons_feature + "_intersect", polygons_feature + "_aggregate", "1 Meters")
+
             # вырезаем агрегированные объекты из основного класса
             arcpy.Erase_analysis(
                 polygons_feature, polygons_feature + "_aggregate", polygons_feature + "_erase")
@@ -569,7 +574,235 @@ class XYtoPolygon(object):
 
             # удаляем переменные
             del mxd, data_frame, default_gdb, path_gdb
-            
+
         except Exception as err:
             arcpy.AddMessage("Ошибка: {0}".format(err))
         return
+
+# -------------------------------------------------
+
+
+class DMStoPointsTable(object):
+
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Добавление полей ГМС в точечный слой"
+        self.description = "Добавление полей ГМС в точечный слой"
+        self.canRunInBackground = False
+
+    def getParameterInfo(self):
+        """Define parameter definitions"""
+
+        # 0 - входной точечный слой
+        points_layer = arcpy.Parameter(
+            name='in_points_layer',
+            displayName='Входной точечный слой',
+            datatype='GPFeatureLayer',
+            direction='Input',
+            parameterType='Optional')
+
+        # 1 - папка для выходного файла Excel
+        excel_path = arcpy.Parameter(
+            name='in_excel_path',
+            displayName='Место сохранения файла Excel',
+            datatype='DEFolder',
+            direction='Input',
+            parameterType='Optional')
+
+        excel_path.value = os.path.dirname(
+            arcpy.mapping.MapDocument("CURRENT").filePath)
+
+        if not excel_path.valueAsText:
+            excel_path.value = os.path.join(os.path.join(
+                os.environ['USERPROFILE']), 'Documents')
+
+        params = [points_layer, excel_path]
+
+        return params
+
+    def isLicensed(self):
+        """Set whether tool is licensed to execute."""
+
+        return True
+
+    def updateParameters(self, parameters):
+        """Modify the values and properties of parameters before internal
+        validation is performed.  This method is called whenever a parameter
+        has been changed."""
+
+        return
+
+    def updateMessages(self, parameters):
+        """Modify the messages created by internal validation for each tool
+        parameter.  This method is called after internal validation."""
+
+        fc = parameters[0].valueAsText
+
+        if fc:
+            desc = arcpy.Describe(parameters[0].valueAsText)
+            if desc.shapeType not in ('Point'):
+                parameters[0].setErrorMessage(
+                    'Необходимо выбрать точечный слой')
+
+            if desc.spatialReference.type not in ('Geographic'):
+                parameters[0].setErrorMessage(
+                    'Необходимо выбрать слой с географической системой координат')
+
+        else:
+            parameters[0].setErrorMessage(
+                'Необходимо выбрать точечный слой')
+
+        return
+
+    def execute(self, parameters, messages):
+        """The source code of the tool."""
+
+        desc = arcpy.Describe(parameters[0].valueAsText)
+
+        arcpy.AddMessage("Name: {}".format(desc.name))
+        arcpy.AddMessage("Shape type: {}".format(desc.shapeType))
+        arcpy.AddMessage("Feature type: {}".format(desc.featureType))
+        arcpy.AddMessage("Spatial Reference: {}".format(
+            desc.spatialReference.name))
+        arcpy.AddMessage("Spatial Reference Type: {}".format(
+            desc.spatialReference.type))
+
+        fields = ['SHAPE@', '_x', '_y', '_gSh', '_mSh',
+                  '_sSh', '_gDl', '_mDl', '_sDl']
+
+        try:
+            arcpy.DeleteField_management(parameters[0].value, fields)
+
+        except Exception as err:
+            pass
+
+        finally:
+            for f in fields:
+                if f in ('SHAPE@'):
+                    pass
+                elif f in ('_x', '_y'):
+                    arcpy.management.AddField(
+                        parameters[0].value, f, 'DOUBLE', "255", 12)
+                elif f in ('_sSh', '_sDl'):
+                    arcpy.management.AddField(
+                        parameters[0].value, f, 'DOUBLE', "255", 6)
+                else:
+                    arcpy.management.AddField(
+                        parameters[0].value, f, 'SHORT')
+
+        with arcpy.da.UpdateCursor(parameters[0].value, fields) as cursor:
+            for row in cursor:
+                for pnt in row[0]:
+                    row[1] = pnt.X
+                    row[2] = pnt.Y
+                    row[3] = self.coord(pnt.Y)[0]
+                    row[4] = self.coord(pnt.Y)[1]
+                    row[5] = self.coord(pnt.Y)[2]
+                    row[6] = self.coord(pnt.X)[0]
+                    row[7] = self.coord(pnt.X)[1]
+                    row[8] = self.coord(pnt.X)[2]
+
+                cursor.updateRow(row)
+
+        # Обновление атрибутивной таблицы
+        layer = parameters[0].value
+        definition_query = layer.definitionQuery
+        if definition_query == '':
+            oid = arcpy.ListFields(dataset=layer, field_type='OID')[0]
+            layer.definitionQuery = '{} > 0'.format(oid.name)
+        else:
+            layer.definitionQuery = ''
+
+        arcpy.RefreshActiveView()
+
+        layer.definitionQuery = definition_query
+        arcpy.RefreshActiveView()
+
+        # Excel-файл
+
+        # Создание стилей для ячеек Excel
+        alignment = xlwt.Alignment()
+        alignment.horz = xlwt.Alignment.HORZ_CENTER
+        alignment.vert = xlwt.Alignment.VERT_CENTER
+
+        border = xlwt.Borders()
+        border.left = xlwt.Borders.THIN
+        border.right = xlwt.Borders.THIN
+        border.top = xlwt.Borders.THIN
+        border.bottom = xlwt.Borders.THIN
+
+        font_head = xlwt.Font()
+        font_head.name = 'Calibri'
+        font_head.height = 220  # высота - 11 (20 * 11 = 220)
+        font_head.colour_index = 0
+        font_head.bold = True
+        font_head.italic = True
+
+        font_cells = xlwt.Font()
+        font_cells.name = 'Calibri'
+        font_cells.height = 220  # высота - 11 (20 * 11 = 220)
+        font_cells.colour_index = 0
+        font_cells.bold = False
+        font_cells.italic = False
+
+        style_head = xlwt.XFStyle()
+        style_head.font = font_head
+        style_head.alignment = alignment
+        style_head.borders = border
+
+        style_cells = xlwt.XFStyle()
+        style_cells.font = font_cells
+        style_cells.alignment = alignment
+        style_cells.borders = border
+
+        # Создание книги и страницы Excel
+        wb = xlwt.Workbook()
+        ws = wb.add_sheet('coord_' + desc.spatialReference.name,
+                          cell_overwrite_ok=True)
+
+        # Создание шапки на странице Excel
+        ws .write_merge(
+            0, 0, 0, 6, 'Система координат - ' + desc.spatialReference.name, style_head)
+        ws.write_merge(1, 2, 0, 0, u'№ п/п', style_head)
+        ws.write_merge(1, 1, 1, 3, u'Северная широта', style_head)
+        ws.write_merge(1, 1, 4, 6, u'Восточная долгота', style_head)
+        ws.write(2, 1, u'гр.', style_head)
+        ws.write(2, 2, u'мин.', style_head)
+        ws.write(2, 3, u'сек.', style_head)
+        ws.write(2, 4, u'гр.', style_head)
+        ws.write(2, 5, u'мин.', style_head)
+        ws.write(2, 6, u'сек.', style_head)
+
+        # Заполнение таблицы Excel
+        fields_excel = ['_gSh', '_mSh', '_sSh', '_gDl', '_mDl', '_sDl']
+
+        row_idx = 3
+        num = 1
+
+        with arcpy.da.SearchCursor(parameters[0].value, fields_excel) as excel_cursor:
+            for row in excel_cursor:
+                for col in range(len(fields_excel)):
+                    # Запись в первое поле номера точки
+                    ws.write(row_idx, 0, num, style_cells)
+                    # Запись значений координат в ячейки
+                    ws.write(row_idx, col + 1, row[col], style_cells)
+                row_idx += 1
+                num += 1
+
+        # путь к файлу Excel
+        path_excel = desc.name + '_' + datetime.datetime.now().strftime('%d_%m_%Y_%H_%M_%S') + \
+            '_' + desc.spatialReference.name + '.xls'
+
+        wb.save(os.path.join(parameters[1].valueAsText, path_excel))
+        subprocess.Popen(os.path.join(
+            parameters[1].valueAsText, path_excel), shell=True)
+
+        return
+
+    def coord(self, dec_coord):
+        _deg = int(dec_coord)
+        _min = int((dec_coord - int(dec_coord)) * 60)
+        _sec = (((dec_coord - int(dec_coord)) * 60) -
+                int((dec_coord - int(dec_coord)) * 60)) * 60
+
+        return [_deg, _min, _sec]
