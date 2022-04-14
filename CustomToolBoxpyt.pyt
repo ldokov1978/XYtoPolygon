@@ -101,7 +101,7 @@ class XYtoPolygonManagement(object):
 
         try:
 
-            book = xlrd.open_wb(
+            book = xlrd.open_workbook(
                 parameters[0].valueAsText)  # получаем книгу Excel
 
             sh = book.sheet_by_index(0)  # Страница книги Excel с индексом 0
@@ -166,7 +166,7 @@ class XYtoPolygonManagement(object):
             arcpy.env.workspace = path_gdb
 
             # получаем книгу Excel
-            book = xlrd.open_wb(
+            book = xlrd.open_workbook(
                 parameters[0].valueAsText)
 
             # получаем страницу книги Excel с индексом=0
@@ -347,7 +347,7 @@ class XYtoPolygon(object):
         has been changed."""
 
         try:
-            book = xlrd.open_wb(
+            book = xlrd.open_workbook(
                 parameters[0].valueAsText)  # получаем книгу Excel
             sh = book.sheet_by_index(0)  # страница книги Excel с индексом 0
 
@@ -411,7 +411,7 @@ class XYtoPolygon(object):
             arcpy.env.workspace = path_gdb
 
             # получаем книгу Excel
-            book = xlrd.open_wb(parameters[0].valueAsText)
+            book = xlrd.open_workbook(parameters[0].valueAsText)
 
             # получаем страницу книги Excel с индексом=0
             sh = book.sheet_by_index(0)
@@ -562,7 +562,7 @@ class XYtoPolygon(object):
             arcpy.AddMessage("Удаляются временные слои... ")
 
             # добавляем слой на карту
-            arcpy.mapping.AddLayer(data_frame, layer_to_map, "BOTTOM")
+            arcpy.mapping.AddLayer(data_frame, layer_to_map, "TOP")
 
             # устанавливаем экстент по добавленному полигональному слою
             data_frame.extent = arcpy.mapping.ListLayers(
@@ -682,10 +682,10 @@ class DMStoPointsTable(object):
                     pass
                 elif f in ('_x', '_y'):
                     arcpy.management.AddField(
-                        parameters[0].value, f, 'DOUBLE', "255", 12)
+                        parameters[0].value, f, 'DOUBLE', '255', 12)
                 elif f in ('_sSh', '_sDl'):
                     arcpy.management.AddField(
-                        parameters[0].value, f, 'DOUBLE', "255", 6)
+                        parameters[0].value, f, 'DOUBLE', '255', 4)
                 else:
                     arcpy.management.AddField(
                         parameters[0].value, f, 'SHORT')
