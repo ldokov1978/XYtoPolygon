@@ -512,8 +512,6 @@ class XYtoPolygon(object):
                 arcpy.AddMessage(
                     "Добавляем значения координат в итоговый список...")
 
-            # arcpy.AddMessage (itog_coord_list)
-
             # строим полигоны и добавляем на карту
             arcpy.AddMessage("Строим полигоны и добавляем на карту...")
 
@@ -532,26 +530,41 @@ class XYtoPolygon(object):
                 featureList.append(polygon)
 
             # создаём основной класс объектов
+            arcpy.AddMessage(
+                "Количество полигонов: {0}".format(len(featureList)))
             arcpy.CopyFeatures_management(featureList, polygons_feature)
+            arcpy.AddMessage("Выходной объект: {0}".format(polygons_feature))
 
-            # создаём класс пересекающих объектов
-            arcpy.Intersect_analysis(
-                polygons_feature, polygons_feature + "_intersect", "NO_FID", "", "INPUT")
+            if parameters[4].valueAsText:
 
-            # агрегируем пересекающиеся объекты
-            arcpy.AggregatePolygons_cartography(
-                polygons_feature + "_intersect", polygons_feature + "_aggregate", "1 Meters")
+                # создаём класс пересекающих объектов
+                arcpy.Intersect_analysis(
+                    polygons_feature, polygons_feature + "_intersect", "NO_FID", "", "INPUT")
+                arcpy.AddMessage("Пересечение...")
 
-            # вырезаем агрегированные объекты из основного класса
-            arcpy.Erase_analysis(
-                polygons_feature, polygons_feature + "_aggregate", polygons_feature + "_erase")
+                # агрегируем пересекающиеся объекты
+                arcpy.AggregatePolygons_cartography(
+                    polygons_feature + "_intersect", polygons_feature + "_aggregate", "1 Meters")
+                arcpy.AddMessage("Агрегирование...")
 
-            # делаем слияние основного класса объектов и вырезанного класса объектов
-            arcpy.Union_analysis(
-                [polygons_feature + "_erase", polygons_feature + "_aggregate"], polygons_feature + "_result", "NO_FID", "", "")
+                # вырезаем агрегированные объекты из основного класса
+                arcpy.Erase_analysis(
+                    polygons_feature, polygons_feature + "_aggregate", polygons_feature + "_erase")
+                arcpy.AddMessage("Вырезание...")
+
+                # делаем слияние основного класса объектов и вырезанного класса объектов
+                arcpy.Union_analysis(
+                    [polygons_feature + "_erase", polygons_feature + "_aggregate"], polygons_feature + "_result", "NO_FID", "", "")
+                arcpy.AddMessage("Слияние...")
+
+            else:
+                arcpy.CopyFeatures_management(
+                    polygons_feature, polygons_feature + "_result")
 
             # создаём слой из результирующего класса объектов
+
             layer_to_map = arcpy.mapping.Layer(polygons_feature + "_result")
+            arcpy.AddMessage("Слой на карту - {0}".format(layer_to_map.name))
 
             # удаляем из базы промежутчные классы объектов
             arcpy.Delete_management(polygons_feature)
